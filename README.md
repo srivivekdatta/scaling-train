@@ -1,6 +1,6 @@
 # Oracle record lookup
 
-A Spring Boot and Thymeleaf app for searching payments, transactions, and messages by ID. Each table is queried independently with a bound parameter. The page shows every matching row, includes empty sections for missing groups, and shows a single message when the ID has no matches.
+A Spring Boot and Thymeleaf app that traces a Payment ID across four Oracle tables. The timeline shows Message (parsed from Kafka and stored), Transaction, Results, and Disposition in that order. Each table is queried independently with a bound parameter. The page shows all matching rows and flags stages with no records. If every table is empty for the Payment ID, the page shows one empty-state message. The Message step is based on stored database rows.
 
 ## Build and run
 
@@ -17,13 +17,14 @@ Open http://localhost:8080. The tests exercise JDBC and Thymeleaf together using
 
 ## Map the Oracle schema
 
-Update `LookupRepository.java` to match your schema. The starter assumes text `LOOKUP_ID` columns and the following projections.
+Update `LookupRepository.java` to match your schema. The starter assumes text `PAYMENT_ID` columns and the following projections.
 
 | Table | Primary key shown | Other field shown |
 |---|---|---|
-| PAYMENT | PAYMENT_ID | STATUS |
-| TRANSACTION | TRANSACTION_ID | STATUS |
 | MESSAGE | MESSAGE_ID | STATUS |
+| TRANSACTION | TRANSACTION_ID | STATUS |
+| RESULTS | RESULT_ID | STATUS |
+| DISPOSITION | DISPOSITION_ID | STATUS |
 
 Qualify the tables with their schema as needed. For a numeric ID, validate and parse it before binding it as a numeric JDBC parameter. If a child table is reachable by foreign key, use its actual relationship in the query. For example, if messages carry a transaction foreign key:
 
@@ -32,12 +33,12 @@ SELECT m.message_id AS record_id, m.status
 FROM message m
 WHERE EXISTS (
     SELECT 1 FROM transaction t
-    WHERE t.transaction_id = m.transaction_id AND t.lookup_id = :id
+    WHERE t.transaction_id = m.transaction_id AND t.payment_id = :paymentId
 )
 ORDER BY m.message_id
 ```
 
-Check the three queries with an ID present in only one or two tables, an ID with multiple rows in a table, and an ID absent from all tables.
+Check the four queries with an ID present in only one or two tables, an ID with multiple rows in a table, and an ID absent from all tables.
 
 ## Deploy on OpenShift
 

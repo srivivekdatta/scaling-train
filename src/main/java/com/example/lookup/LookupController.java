@@ -23,21 +23,21 @@ public class LookupController {
     }
 
     @PostMapping("/")
-    public String search(@RequestParam(name = "id", defaultValue = "") String id,
+    public String search(@RequestParam(name = "paymentId", defaultValue = "") String paymentId,
                          Model model, HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
-        String lookupId = id.strip();
-        if (lookupId.isEmpty() || lookupId.length() > 128) {
+        String normalizedId = paymentId.strip();
+        if (normalizedId.isEmpty() || normalizedId.length() > 128) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            model.addAttribute("error", "Enter an ID between 1 and 128 characters.");
+            model.addAttribute("error", "Enter a Payment ID between 1 and 128 characters.");
             return "lookup";
         }
 
-        model.addAttribute("id", lookupId);
+        model.addAttribute("paymentId", normalizedId);
         try {
-            var groups = repository.find(lookupId);
-            model.addAttribute("groups", groups);
-            model.addAttribute("hasResults", groups.stream().anyMatch(group -> !group.rows().isEmpty()));
+            var stages = repository.find(normalizedId);
+            model.addAttribute("stages", stages);
+            model.addAttribute("hasRecords", stages.stream().anyMatch(stage -> !stage.rows().isEmpty()));
         } catch (DataAccessException ex) {
             response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             model.addAttribute("error", "The database lookup is unavailable. Try again shortly.");

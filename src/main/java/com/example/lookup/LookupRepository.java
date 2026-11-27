@@ -14,28 +14,32 @@ public class LookupRepository {
         this.jdbc = jdbc;
     }
 
-    public List<Group> find(String id) {
+    public List<Stage> find(String paymentId) {
         return List.of(
-            new Group("Payments", query("""
-                SELECT payment_id AS record_id, status FROM payment
-                WHERE lookup_id = :id ORDER BY payment_id
-                """, id)),
-            new Group("Transactions", query("""
-                SELECT transaction_id AS record_id, status FROM transaction
-                WHERE lookup_id = :id ORDER BY transaction_id
-                """, id)),
-            new Group("Messages", query("""
+            new Stage("Message", "The Kafka message is parsed and stored.", query("""
                 SELECT message_id AS record_id, status FROM message
-                WHERE lookup_id = :id ORDER BY message_id
-                """, id))
+                WHERE payment_id = :paymentId ORDER BY message_id
+                """, paymentId)),
+            new Stage("Transaction", "Transaction records for this payment.", query("""
+                SELECT transaction_id AS record_id, status FROM transaction
+                WHERE payment_id = :paymentId ORDER BY transaction_id
+                """, paymentId)),
+            new Stage("Results", "Processing results for this payment.", query("""
+                SELECT result_id AS record_id, status FROM results
+                WHERE payment_id = :paymentId ORDER BY result_id
+                """, paymentId)),
+            new Stage("Disposition", "Final disposition records for this payment.", query("""
+                SELECT disposition_id AS record_id, status FROM disposition
+                WHERE payment_id = :paymentId ORDER BY disposition_id
+                """, paymentId))
         );
     }
 
-    private List<Row> query(String sql, String id) {
-        return jdbc.query(sql, Map.of("id", id), (rs, index) ->
+    private List<Row> query(String sql, String paymentId) {
+        return jdbc.query(sql, Map.of("paymentId", paymentId), (rs, index) ->
             new Row(rs.getString("record_id"), rs.getString("status")));
     }
 
-    public record Group(String title, List<Row> rows) {}
+    public record Stage(String title, String description, List<Row> rows) {}
     public record Row(String id, String status) {}
 }

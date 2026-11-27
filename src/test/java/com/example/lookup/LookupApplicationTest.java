@@ -9,6 +9,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.stringContainsInOrder;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -17,43 +19,53 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Sql(statements = {
     "DROP ALL OBJECTS",
-    "CREATE TABLE payment (payment_id VARCHAR2(30) PRIMARY KEY, lookup_id VARCHAR2(128), status VARCHAR2(30))",
-    "CREATE TABLE transaction (transaction_id VARCHAR2(30) PRIMARY KEY, lookup_id VARCHAR2(128), status VARCHAR2(30))",
-    "CREATE TABLE message (message_id VARCHAR2(30) PRIMARY KEY, lookup_id VARCHAR2(128), status VARCHAR2(30))",
-    "INSERT INTO payment VALUES ('PAY-01', 'A', 'PAID'), ('PAY-02', 'A', 'PENDING')",
-    "INSERT INTO transaction VALUES ('TX-01', 'B', 'COMPLETE')",
-    "INSERT INTO message VALUES ('MSG-01', 'A', 'SENT')"
+    "CREATE TABLE message (message_id VARCHAR2(30) PRIMARY KEY, payment_id VARCHAR2(128), status VARCHAR2(30))",
+    "CREATE TABLE transaction (transaction_id VARCHAR2(30) PRIMARY KEY, payment_id VARCHAR2(128), status VARCHAR2(30))",
+    "CREATE TABLE results (result_id VARCHAR2(30) PRIMARY KEY, payment_id VARCHAR2(128), status VARCHAR2(30))",
+    "CREATE TABLE disposition (disposition_id VARCHAR2(30) PRIMARY KEY, payment_id VARCHAR2(128), status VARCHAR2(30))",
+    "INSERT INTO message VALUES ('MSG-01', 'PAY-A', 'STORED'), ('MSG-02', 'PAY-A', 'STORED')",
+    "INSERT INTO transaction VALUES ('TX-01', 'PAY-A', 'COMPLETE')",
+    "INSERT INTO results VALUES ('RES-01', 'PAY-A', 'ACCEPTED')",
+    "INSERT INTO disposition VALUES ('DSP-01', 'PAY-A', 'SETTLED'), ('DSP-02', 'PAY-B', 'SETTLED')"
 })
 class LookupApplicationTest {
     @Autowired
     private MockMvc mvc;
 
     @Test
-    void rendersMultipleRowsAndAnEmptySection() throws Exception {
-        mvc.perform(post("/").param("id", "A"))
+    void opensWithPaymentIdFormAndNoTimeline() throws Exception {
+        mvc.perform(get("/"))
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("PAY-01")))
-            .andExpect(content().string(containsString("PAY-02")))
-            .andExpect(content().string(containsString("MSG-01")))
-            .andExpect(content().string(containsString("<h2>Transactions</h2>")))
-            .andExpect(content().string(containsString("No matching records.")))
-            .andExpect(content().string(not(containsString("TX-01"))));
+            .andExpect(content().string(containsString("name=\"paymentId\"")))
+            .andExpect(content().string(not(containsString("Processing flow"))));
     }
 
     @Test
-    void rendersRecordsWhenOnlyOneTableMatches() throws Exception {
-        mvc.perform(post("/").param("id", "B"))
+    void rendersAllMatchingRowsInStageOrder() throws Exception {
+        mvc.perform(post("/").param("paymentId", "PAY-A"))
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("TX-01")))
-            .andExpect(content().string(containsString("<h2>Messages</h2>")))
-            .andExpect(content().string(not(containsString("PAY-01"))));
+            .andExpect(content().string(stringContainsInOrder(
+                "<h3>Message</h3>", "MSG-01", "MSG-02", "<h3>Transaction</h3>", "TX-01",
+                "<h3>Results</h3>", "RES-01", "<h3>Disposition</h3>", "DSP-01")))
+            .andExpect(content().string(not(containsString("DSP-02"))))
+            .andExpect(content().string(not(containsString("No records found"))));
+    }
+
+    @Test
+    void rendersDispositionEvenWhenEarlierStagesAreMissing() throws Exception {
+        mvc.perform(post("/").param("paymentId", "PAY-B"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(stringContainsInOrder(
+                "<h3>Message</h3>", "No records found", "<h3>Transaction</h3>", "No records found",
+                "<h3>Results</h3>", "No records found", "<h3>Disposition</h3>", "DSP-02")))
+            .andExpect(content().string(not(containsString("No records found for this Payment ID."))));
     }
 
     @Test
     void rendersOneEmptyStateWhenEveryTableIsEmpty() throws Exception {
-        mvc.perform(post("/").param("id", "unknown"))
+        mvc.perform(post("/").param("paymentId", "unknown"))
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("No records found for this ID.")))
-            .andExpect(content().string(not(containsString("<section>"))));
+            .andExpect(content().string(containsString("No records found for this Payment ID.")))
+            .andExpect(content().string(not(containsString("Processing flow"))));
     }
 }
