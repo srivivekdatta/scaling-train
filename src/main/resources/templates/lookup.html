@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Record lookup</title>
+    <style>
+        body { font: 1rem/1.5 system-ui, sans-serif; margin: 0; color: #182438; background: #f1f5f9; }
+        main { max-width: 54rem; margin: 3rem auto; padding: 0 1rem; }
+        form, section { background: white; border: 1px solid #cbd5e1; border-radius: .6rem; padding: 1.2rem; margin-bottom: 1rem; }
+        label { display: block; font-weight: 600; }
+        input, button { font: inherit; padding: .55rem .75rem; margin-top: .4rem; border-radius: .35rem; }
+        input { border: 1px solid #64748b; max-width: 75%; }
+        button { color: white; background: #174768; border: 1px solid #174768; cursor: pointer; }
+        h2 { margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: .5rem; border-bottom: 1px solid #e2e8f0; overflow-wrap: anywhere; }
+        [role=alert] { color: #9b2921; }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Record lookup</h1>
+    <form method="post" th:action="@{/}">
+        <label for="id">Lookup ID</label>
+        <input id="id" name="id" th:value="${id}" maxlength="128" required>
+        <button>Search</button>
+    </form>
+    <p th:if="${error != null}" th:text="${error}" role="alert"></p>
+    <div th:if="${groups != null}">
+        <p th:unless="${hasResults}">No records found for this ID.</p>
+        <div th:if="${hasResults}">
+            <section th:each="group : ${groups}">
+                <h2 th:text="${group.title()}"></h2>
+                <p th:if="${group.rows().isEmpty()}">No matching records.</p>
+                <table th:unless="${group.rows().isEmpty()}">
+                    <thead><tr><th scope="col">Record ID</th><th scope="col">Status</th></tr></thead>
+                    <tbody>
+                    <tr th:each="row : ${group.rows()}">
+                        <td th:text="${row.id()}"></td>
+                        <td th:text="${row.status()}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </section>
+        </div>
+    </div>
+</main>
+</body>
+</html>
