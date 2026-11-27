@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oracle-lookup
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oracle-lookup
+  template:
+    metadata:
+      labels:
+        app: oracle-lookup
+    spec:
+      containers:
+        - name: app
+          image: registry.example.com/apps/oracle-lookup:0.1.0
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: oracle-lookup-db
+                  key: url
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: oracle-lookup-db
+                  key: username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: oracle-lookup-db
+                  key: password
+            - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
+              value: "true"
+            - name: MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE
+              value: "readinessState,db"
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oracle-lookup
+spec:
+  selector:
+    app: oracle-lookup
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
