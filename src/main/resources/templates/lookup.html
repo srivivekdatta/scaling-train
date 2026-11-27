@@ -3,72 +3,76 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Payment processing lookup</title>
-    <style>
-        body { font: 1rem/1.5 system-ui, sans-serif; margin: 0; color: #182438; background: #f1f5f9; }
-        main { max-width: 48rem; margin: 2.5rem auto; padding: 0 1rem; }
-        h1, h2, h3 { line-height: 1.2; }
-        form, .stage, .empty { background: white; border: 1px solid #cbd5e1; border-radius: .65rem; padding: 1rem 1.2rem; }
-        label { display: block; font-weight: 650; margin-bottom: .4rem; }
-        .search { display: flex; gap: .5rem; flex-wrap: wrap; }
-        input, button { font: inherit; padding: .55rem .75rem; border-radius: .35rem; }
-        input { flex: 1 1 14rem; min-width: 0; border: 1px solid #64748b; }
-        button { color: white; background: #174768; border: 1px solid #174768; cursor: pointer; }
-        .timeline { padding-inline-start: 2.35rem; }
-        .timeline > li { position: relative; padding: 0 0 1rem .45rem; }
-        .timeline > li::marker { color: #174768; font-weight: 700; }
-        .timeline > li:not(:last-child)::before {
-            content: ""; position: absolute; inset-block: 1.65rem -.1rem;
-            inset-inline-start: -.85rem; border-inline-start: 2px solid #cbd5e1;
-        }
-        .stage-header { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem; }
-        h3 { margin: 0; }
-        .description { margin: .4rem 0 .7rem; color: #475569; }
-        .count { color: #14532d; background: #dcfce7; border-radius: 1rem; padding: .12rem .55rem; font-size: .875rem; }
-        .count.missing { color: #334155; background: #e2e8f0; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: .45rem; border-bottom: 1px solid #e2e8f0; overflow-wrap: anywhere; }
-        [role=alert] { color: #9b2921; }
-    </style>
+    <meta name="htmx-config" content='{"includeIndicatorStyles":false,"allowEval":false,"allowScriptTags":false,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"400|503","swap":true,"error":true},{"code":"[45]..","swap":false,"error":true}]}'>
+    <title>Payment lookup</title>
+    <link rel="stylesheet" th:href="@{/lookup.css}">
+    <script defer th:src="@{/webjars/htmx.org/2.0.8/dist/htmx.min.js}"></script>
 </head>
 <body>
-<main>
-    <h1>Payment processing lookup</h1>
-    <form method="post" th:action="@{/}">
+<header class="masthead">
+    <div class="shell">
+        <h1>Payment lookup</h1>
+        <p>Trace a payment from the incoming Kafka message to its final disposition.</p>
+    </div>
+</header>
+
+<main class="shell workspace">
+    <form class="search-card" method="post" th:action="@{/}" th:attr="hx-post=@{/}"
+          hx-target="#lookup-results" hx-swap="outerHTML" hx-disabled-elt="find button">
         <label for="paymentId">Payment ID</label>
-        <div class="search">
-            <input id="paymentId" name="paymentId" th:value="${paymentId}" maxlength="128" required>
-            <button type="submit">Search</button>
-        </div>
+        <input id="paymentId" name="paymentId" th:value="${paymentId}" maxlength="128"
+               placeholder="Enter Payment ID" required>
+        <button type="submit">
+            <span class="button-label">Search payment</span>
+            <span class="loading-label">Searching…</span>
+        </button>
     </form>
-    <p th:if="${error != null}" th:text="${error}" role="alert"></p>
-    <div th:if="${stages != null}">
-        <p class="empty" th:unless="${hasRecords}">No records found for this Payment ID.</p>
-        <section th:if="${hasRecords}" aria-labelledby="processing-flow">
-            <h2 id="processing-flow">Processing flow</h2>
-            <ol class="timeline">
-                <li th:each="stage : ${stages}">
-                    <article class="stage">
-                        <header class="stage-header">
-                            <h3 th:text="${stage.title()}"></h3>
-                            <span class="count missing" th:if="${stage.rows().isEmpty()}">No records found</span>
-                            <span class="count" th:unless="${stage.rows().isEmpty()}"
-                                  th:text="${stage.rows().size() == 1 ? '1 record' : stage.rows().size() + ' records'}"></span>
-                        </header>
-                        <p class="description" th:text="${stage.description()}"></p>
-                        <table th:unless="${stage.rows().isEmpty()}">
-                            <thead><tr><th scope="col">Record ID</th><th scope="col">Status</th></tr></thead>
-                            <tbody>
-                            <tr th:each="row : ${stage.rows()}">
-                                <td th:text="${row.id()}"></td>
-                                <td th:text="${row.status()}"></td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </article>
-                </li>
-            </ol>
-        </section>
+
+    <div class="results-region" aria-live="polite">
+        <div id="lookup-results" th:fragment="results">
+            <div class="state error" th:if="${error != null}" role="alert">
+                <h2>Search could not be completed</h2>
+                <p th:text="${error}"></p>
+            </div>
+            <div class="state" th:if="${stages == null and error == null}">
+                <h2>Look up a payment</h2>
+                <p>Enter its Payment ID to see the records at each stage.</p>
+            </div>
+            <div class="state" th:if="${stages != null and !hasRecords}">
+                <h2>No records found</h2>
+                <p>No records found for this Payment ID.</p>
+                <p class="payment-id" th:text="${paymentId}"></p>
+            </div>
+            <section th:if="${hasRecords}" aria-labelledby="processing-flow">
+                <div class="flow-header">
+                    <h2 id="processing-flow">Processing flow</h2>
+                    <p>Payment ID <span class="payment-id" th:text="${paymentId}"></span></p>
+                </div>
+                <ol class="timeline" role="list">
+                    <li th:each="stage, step : ${stages}">
+                        <span class="step-number" aria-hidden="true" th:text="${step.count}"></span>
+                        <article class="stage">
+                            <header class="stage-header">
+                                <h3 th:text="${stage.title()}"></h3>
+                                <span class="count missing" th:if="${stage.rows().isEmpty()}">No records found</span>
+                                <span class="count" th:unless="${stage.rows().isEmpty()}"
+                                      th:text="${stage.rows().size() == 1 ? '1 record' : stage.rows().size() + ' records'}"></span>
+                                <p class="description" th:text="${stage.description()}"></p>
+                            </header>
+                            <table th:unless="${stage.rows().isEmpty()}" th:attr="aria-label=${stage.title() + ' records'}">
+                                <thead><tr><th scope="col">Record ID</th><th scope="col">Status</th></tr></thead>
+                                <tbody>
+                                <tr th:each="row : ${stage.rows()}">
+                                    <td class="record-id" th:text="${row.id()}"></td>
+                                    <td th:text="${row.status()}"></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </article>
+                    </li>
+                </ol>
+            </section>
+        </div>
     </div>
 </main>
 </body>

@@ -1,6 +1,6 @@
 # Oracle record lookup
 
-A Spring Boot and Thymeleaf app that traces a Payment ID across four Oracle tables. The timeline shows Message (parsed from Kafka and stored), Transaction, Results, and Disposition in that order. Each table is queried independently with a bound parameter. The page shows all matching rows and flags stages with no records. If every table is empty for the Payment ID, the page shows one empty-state message. The Message step is based on stored database rows.
+A Spring Boot and Thymeleaf app that traces a Payment ID across four Oracle tables. The timeline shows Message (parsed from Kafka and stored), Transaction, Results, and Disposition in that order. HTMX refreshes the results in place, and the form also works with JavaScript disabled. Each table is queried independently with a bound parameter. The page shows all matching rows and flags stages with no records. If every table is empty for the Payment ID, the page shows one empty-state message. The Message step is based on stored database rows.
 
 ## Build and run
 

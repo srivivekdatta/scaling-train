@@ -62,6 +62,26 @@ class LookupApplicationTest {
     }
 
     @Test
+    void htmxSearchReturnsOnlyTheResultsAndPreservesValidationStatus() throws Exception {
+        mvc.perform(post("/").header("HX-Request", "true").param("paymentId", "PAY-A"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("id=\"lookup-results\"")))
+            .andExpect(content().string(containsString("DSP-01")))
+            .andExpect(content().string(not(containsString("<form"))));
+
+        mvc.perform(post("/").header("HX-Request", "true").param("paymentId", " "))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().string(containsString("Enter a Payment ID")))
+            .andExpect(content().string(not(containsString("<form"))));
+    }
+
+    @Test
+    void servesHtmxFromTheApplication() throws Exception {
+        mvc.perform(get("/webjars/htmx.org/2.0.8/dist/htmx.min.js"))
+            .andExpect(status().isOk());
+    }
+
+    @Test
     void rendersOneEmptyStateWhenEveryTableIsEmpty() throws Exception {
         mvc.perform(post("/").param("paymentId", "unknown"))
             .andExpect(status().isOk())
